@@ -14,36 +14,52 @@ class ViewController: UIViewController {
     private var items = Fruits.defaultItems
     private let checkMark = UIImage(named: "check-mark")
     private var selectedIndexPath: IndexPath?
-    private var isEditStatus = false
-    private var isSelectedChecked: Bool? // check-markのステータス
-
-    @IBAction func save(segue: UIStoryboardSegue) {
-
-        let secondVC = segue.source as? SecondViewController
-        guard let label = secondVC?.getInputText() else { return }
-
-        if isEditStatus {
-            guard let selectedRow = selectedIndexPath?.row, let isCheckd = isSelectedChecked else { return }
-            items[selectedRow] = (label, isCheckd)
-            isEditStatus = false
-        } else {
-            items.append((label, false))
-        }
-        tableView.reloadData()
-    }
-
-    @IBAction func cancel(segue: UIStoryboardSegue) {}
 
     override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
 
         if segue.identifier == "addSegue" {
-            isEditStatus = false // 新規で項目を追加するときにフラグをリセット
+            guard let navigationController = segue.destination as? UINavigationController,
+                  let secondViewController = navigationController.topViewController as? SecondViewController else {
+                return
+            }
+
+            secondViewController.mode = .add(
+                SecondViewController.Mode.AddParameter(
+                    cancel: { [weak self] in
+                        self?.dismiss(animated: true)
+                    },
+                    save: { [weak self] newName in
+                        self?.items.append((newName, false))
+                        self?.tableView.reloadData()
+
+                        self?.dismiss(animated: true)
+                    }
+                )
+            )
         } else if segue.identifier == "AccessorySegue" {
             guard let indexPath = selectedIndexPath else { return }
-            let navVC = segue.destination as? UINavigationController
-            let secondVC = navVC?.topViewController as? SecondViewController
-            secondVC?.editText = items[indexPath.row].0
-            isSelectedChecked = items[indexPath.row].1
+
+            guard let navigationController = segue.destination as? UINavigationController,
+                  let secondViewController = navigationController.topViewController as? SecondViewController else {
+                return
+            }
+
+            secondViewController.mode = .edit(
+                SecondViewController.Mode.EditParameter(
+                    name: items[indexPath.row].0,
+                    cancel: { [weak self] in
+                        self?.dismiss(animated: true)
+                    },
+                    save: { [weak self] newName in
+                        guard let strongSelf = self else { return }
+
+                        strongSelf.items[indexPath.row] = (newName, strongSelf.items[indexPath.row].1)
+                        strongSelf.tableView.reloadData()
+
+                        strongSelf.dismiss(animated: true)
+                    }
+                )
+            )
         }
     }
 }
@@ -72,7 +88,6 @@ extension ViewController: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, accessoryButtonTappedForRowWith indexPath: IndexPath) {
         selectedIndexPath = indexPath
-        isEditStatus = true
         performSegue(withIdentifier: "AccessorySegue", sender: nil)
     }
 }
